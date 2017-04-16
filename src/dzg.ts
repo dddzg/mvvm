@@ -1,6 +1,9 @@
+interface Data{
+    [index:string]:any
+}
 interface DzgConfig{
     el:string,
-    data:{}
+    data:Data
 }
 
 class Dzg implements DzgConfig{
@@ -9,13 +12,34 @@ class Dzg implements DzgConfig{
     }
     static nowNode:Node;
     el:string;
-    data:{};
+    data:Data;
     domRoot:HTMLElement;
+    map:Map<any,Node[]>=new Map();
     constructor(config:DzgConfig){
         this.el=config.el;
-        this.data=config.data;
+        let that=this;
+        this.data=new Proxy(config.data,{
+            get(target, key, receiver){
+                return Reflect.get(target, key, receiver);
+            },
+            set(target, key, value, receiver){
+                if (value===target[key]){
+                    return false;
+                }else{
+                    let Queue=that.map.get(key);
+                    Queue.forEach((Value,index)=>{
+                        Value.nodeValue=value;
+                    })
+                    return Reflect.set(target, key, value, receiver);
+                }
+
+            }
+        });
         this.domRoot=document.querySelector(this.el) as HTMLElement;
         this.parseAndRender(this.domRoot); 
+
+        // this.proxy.message='123'
+        // console.log(this.proxy.message);
     }
 
     /**
@@ -39,7 +63,7 @@ class Dzg implements DzgConfig{
         for (let i=0;i<root.childNodes.length;++i){
             Dzg.nowNode=root.childNodes.item(i);
             
-            
+            //text的情况
             if (Dzg.nowNode.nodeName===Dzg.nodeName.text){ //<div>123</div>不会再这一层解析
                 this.parseText(Dzg.nowNode);
             }
@@ -48,7 +72,7 @@ class Dzg implements DzgConfig{
             // }
 
             if (Dzg.nowNode.hasChildNodes()){
-                this.parseAndRender(Dzg.nowNode as HTMLElement);
+                this.parseAndRender(Dzg.nowNode as HTMLElement);  //递归
             }
             // if (child.nodeType)
         }
@@ -71,8 +95,14 @@ class Dzg implements DzgConfig{
      * @memberOf Dzg
      */
     parseText(node:Node){
-        node.nodeValue=node.nodeValue=node.nodeValue.replace(/{{(.*)}}/g, (a, b) => {  //把{{变量}}把变量全部提取出来 
-            return this.data[b]
+        node.nodeValue =
+        node.nodeValue.replace(/{{(.*)}}/g, (initData, key) => {
+            let initQue=this.map.get(key) || [];
+            initQue.push(node);
+            this.map.set(key,initQue);
+            this.data.message='123545';
+            return this.data[key]
         })
+        //把{{变量}}把变量全部提取出来 
     }
 }
