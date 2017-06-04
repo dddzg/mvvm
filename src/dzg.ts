@@ -7,35 +7,19 @@ interface DzgConfig {
 }
 
 class Dzg implements DzgConfig {
-	static nodeName= {
+	static nodeType= {
 		text: '#text'
 	}
 	static nowNode: Node
 	el: string
 	data: Data
 	domRoot: HTMLElement
-	map: Map<any, Node[]>= new Map()
+	mapHtml: WeakMap<{target: Data, key: any}, Node[]> = new WeakMap()
 
 	constructor(config: DzgConfig) {
 		this.el = config.el
 		let that = this
-		this.data = new Proxy(config.data, {
-			get(target, key, receiver) {
-				return Reflect.get(target, key, receiver)
-			},
-			set(target, key, value, receiver) {
-				if (value === target[key]) {
-					return false
-				}else {
-					let Queue = that.map.get(key)
-					Queue && Queue.forEach((Value, index) => {
-						Value.nodeValue = value
-					})
-					return Reflect.set(target, key, value, receiver)
-				}
-
-			}
-		})
+    this.data = this.buildProxy(config.data)
 		this.domRoot = document.querySelector(this.el) as HTMLElement
 		this.parseAndRender(this.domRoot)
 
@@ -56,15 +40,11 @@ class Dzg implements DzgConfig {
 	 * @memberOf Dzg
 	 */
 	parseAndRender(root: HTMLElement) {
-
-		// console.log(root,root.childElementCount);
-		// console.log(root.children);
-		// console.log(root.childNodes);
 		for (let i = 0; i < root.childNodes.length; ++i) {
 			Dzg.nowNode = root.childNodes.item(i)
-
 			// text的情况
-			if (Dzg.nowNode.nodeName === Dzg.nodeName.text) { // <div>123</div>不会再这一层解析
+			if (Dzg.nowNode.nodeName === Dzg.nodeType.text) { 
+        // <div>123</div>不会再这一层解析
 				this.parseText(Dzg.nowNode)
 			}
 			// else{
@@ -76,14 +56,6 @@ class Dzg implements DzgConfig {
 			}
 			// if (child.nodeType)
 		}
-		// for (let i=0;i<root.childElementCount;++i){
-		//     let child=root.children.item(i) as HTMLElement;
-		//     if (child.childElementCount){
-		//         this.parseAndRender(child);
-		//     }else{
-		//         console.log(child);
-		//     }
-		// }
 	}
 	/**
 	 * node有各种api:
@@ -98,11 +70,65 @@ class Dzg implements DzgConfig {
 	  if (node.nodeValue === null) return
 	  node.nodeValue =
 	  node.nodeValue.replace(/{{(.*)}}/g, (initData, key) => {
-		  let initQue = this.map.get(key) || []
+			// key可能会是xx.yy
+      let obj = this.getObject(key)
+		  let initQue = this.mapHtml.get(obj) || []
 		  initQue.push(node)
-		  this.map.set(key, initQue)
-		  return this.data[key]
+		  this.mapHtml.set(obj, initQue)
+		  return obj.target[obj.key]
 	  })
 	  // 把{{变量}}把变量全部提取出来
 	}
+  /**
+   * 解析xx.yy.zz
+   * @param key 
+   */
+  parseKey(key: string) {
+    return key.split('.')
+  }
+  getObject(key: string) {
+    let keyArray = this.parseKey(key)
+    let length = keyArray.length
+    let target = this.data
+    for (let i = 0; i < length - 1; ++i) {
+      let k = keyArray[i]
+      target = target[k]
+    }
+    return {
+      target: target,
+      key: keyArray[length - 1]
+    }
+  }
+  buildProxy(data: Data= {}) {
+    for (let [k, v] of Object.entries(data)){
+      if (Util.isObject(v)) {
+        data[k] = this.buildProxy(v)
+      }
+    }
+    let that = this
+    data = new Proxy(data, {
+      get(target, key, receiver) {
+        return Reflect.get(target, key, receiver)
+      },
+      set(target, key, value, receiver) {
+        if (value === target[key]) {
+          return false
+        } else {
+          let Queue = that.mapHtml.get({target, key})
+          Queue && Queue.forEach((Value) => {
+            Value.nodeValue = value
+          })
+          return Reflect.set(target, key, value, receiver)
+        }
+      }
+    })
+    return data
+  }
+}
+
+
+class Util {
+  static isObject(data: any) {
+    return data !== null && (typeof data === 'object')
+  }
 }
