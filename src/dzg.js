@@ -27,6 +27,11 @@ var __read = (this && this.__read) || function (o, n) {
 };
 var Dzg = (function () {
     function Dzg(config) {
+        if (config === void 0) { config = {
+            el: '#root',
+            method: {},
+            data: {}
+        }; }
         this.mapHtml = new Map();
         this.prefix = 'dzg-';
         this.el = config.el;
@@ -107,18 +112,37 @@ var Dzg = (function () {
     Dzg.prototype.parseTagWithAttributes = function (node) {
         var attributes = node.attributes;
         var length = node.attributes.length;
+        // console.log(node.attributes.removeNamedItem(attributes[0].nodeName))
+        // node.setAttribute('dzg', '123')
+        // console.log(node.attributes)
+        var removeList = [];
+        // let addList = new Map < string, string >()
         for (var i = 0; i < length; ++i) {
             var attr = attributes[i];
             var _a = this.parseAttribute(attr), key = _a.key, type = _a.type, value = _a.value;
-            console.log(key, type, value);
+            // console.log(key, type, value)
+            // console.log(attr)
+            if (type !== 0)
+                removeList.push(attr.nodeName);
+            if (value === null)
+                continue;
             if (type === 2) {
                 if (value !== null) {
-                    console.log(this.method);
+                    // console.log(this.method)
                     if (value in this.method)
                         node.addEventListener(key, this.method[value].bind(this.data));
                 }
             }
+            else if (type === 3) {
+                // console.log(key, type, value)
+                node.setAttribute(key, this.getValueByString(value));
+                this.createInitBinding(value, node.getAttributeNode(key));
+                // if (value !== null) addList.set(key, value)
+            }
         }
+        removeList.forEach(function (value) { return node.removeAttribute(value); });
+        // addList.forEach((value, key) => node.setAttribute(key, value))
+        console.log(removeList);
     };
     /**
      * node有各种api:
@@ -134,15 +158,20 @@ var Dzg = (function () {
         if (node.nodeValue === null)
             return;
         node.nodeValue =
-            node.nodeValue.replace(/{{(.*)}}/g, function (initData, initKey) {
-                // initKey可能会是xx.yy
-                var _a = _this.getObject(initKey), target = _a.target, key = _a.key;
-                var initQue = _this.mapHtml.get(target) || [];
-                initQue.push(node);
-                _this.mapHtml.set(target, initQue);
-                return target[key];
-            });
+            node.nodeValue.replace(/{{(.*)}}/g, function (_, initKey) { return _this.createInitBinding(initKey, node); });
         // 把{{变量}}把变量全部提取出来
+    };
+    Dzg.prototype.getValueByString = function (initKey) {
+        var _a = this.getObject(initKey), target = _a.target, key = _a.key;
+        return target[key];
+    };
+    Dzg.prototype.createInitBinding = function (initKey, node) {
+        // initKey可能是xx.yy
+        var _a = this.getObject(initKey), target = _a.target, key = _a.key;
+        var initQue = this.mapHtml.get(target) || [];
+        initQue.push(node);
+        this.mapHtml.set(target, initQue);
+        return target[key];
     };
     /**
      * 解析xx.yy.zz

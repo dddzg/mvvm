@@ -18,7 +18,11 @@ class Dzg implements DzgConfig {
 	mapHtml: Map<Data, Node[]> = new Map()
   method: any
   prefix= 'dzg-'
-	constructor(config: DzgConfig) {
+	constructor(config= {
+    el: '#root',
+    method: {},
+    data: {}
+  }) {
 		this.el = config.el
 		let that = this
     this.method = config.method // 调用时 绑定this.data
@@ -57,7 +61,7 @@ class Dzg implements DzgConfig {
            * 类似于 <div dzg-onclick="plus"></div>
            * 记得把事件委托到root结点 统一处理 
            */
-          this.parseTagWithAttributes(Dzg.nowNode)
+          this.parseTagWithAttributes(Dzg.nowNode as Element)
         }
       }
 			// else{
@@ -94,21 +98,37 @@ class Dzg implements DzgConfig {
       value: attr.nodeValue
     }
   }
-  parseTagWithAttributes(node: Node) {
+  parseTagWithAttributes(node: Element) {
     let attributes = node.attributes
     let length = node.attributes.length
+    // console.log(node.attributes.removeNamedItem(attributes[0].nodeName))
+    // node.setAttribute('dzg', '123')
+    // console.log(node.attributes)
+    let removeList: string[] = []
+    // let addList = new Map < string, string >()
     for (let i = 0; i < length; ++i) {
       let attr = attributes[i]
       let {key, type, value} = this.parseAttribute(attr)
-      console.log(key, type, value)
+      // console.log(key, type, value)
+      // console.log(attr)
+      if (type !== 0) removeList.push(attr.nodeName)
+      if (value === null) continue
       if (type === 2) {
         if (value !== null) {
-          console.log(this.method)
+          // console.log(this.method)
           if (value in this.method)
           node.addEventListener(key, this.method[value].bind(this.data))
         }
+      } else if (type === 3) {
+        // console.log(key, type, value)
+        node.setAttribute(key, this.getValueByString(value))
+        this.createInitBinding(value, node.getAttributeNode(key))
+        // if (value !== null) addList.set(key, value)
       }
     }
+    removeList.forEach(value => node.removeAttribute(value))
+    // addList.forEach((value, key) => node.setAttribute(key, value))
+    console.log(removeList)
   }
 	/**
 	 * node有各种api:
@@ -122,16 +142,22 @@ class Dzg implements DzgConfig {
 	parseText(node: Node) {
 	  if (node.nodeValue === null) return
 	  node.nodeValue =
-	  node.nodeValue.replace(/{{(.*)}}/g, (initData, initKey) => {
-			// initKey可能会是xx.yy
-      let {target, key} = this.getObject(initKey)
-		  let initQue = this.mapHtml.get(target) || []
-		  initQue.push(node)
-		  this.mapHtml.set(target, initQue)
-		  return target[key]
-	  })
+	  node.nodeValue.replace(/{{(.*)}}/g,
+    (_, initKey) => this.createInitBinding(initKey, node))
 	  // 把{{变量}}把变量全部提取出来
 	}
+  getValueByString(initKey: string) {
+    let {target, key} = this.getObject(initKey)
+    return target[key]
+  }
+  createInitBinding(initKey: string, node: Node) {
+    // initKey可能是xx.yy
+    let {target, key} = this.getObject(initKey)
+    let initQue = this.mapHtml.get(target) || []
+    initQue.push(node)
+    this.mapHtml.set(target, initQue)
+    return target[key]
+  }
   /**
    * 解析xx.yy.zz
    * @param key 
