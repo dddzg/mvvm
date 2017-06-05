@@ -3,7 +3,8 @@ interface Data {
 }
 interface DzgConfig {
 	el: string,
-	data: Data
+	data: Data,
+  method?: any
 }
 
 class Dzg implements DzgConfig {
@@ -14,7 +15,7 @@ class Dzg implements DzgConfig {
 	el: string
 	data: Data
 	domRoot: HTMLElement
-	mapHtml: WeakMap<{target: Data, key: any}, Node[]> = new WeakMap()
+	mapHtml: Map<Data, Node[]> = new Map()
 
 	constructor(config: DzgConfig) {
 		this.el = config.el
@@ -22,7 +23,7 @@ class Dzg implements DzgConfig {
     this.data = this.buildProxy(config.data)
 		this.domRoot = document.querySelector(this.el) as HTMLElement
 		this.parseAndRender(this.domRoot)
-
+    config.method.plus()
 		// this.proxy.message='123'
 		// console.log(this.proxy.message);
 	}
@@ -72,9 +73,9 @@ class Dzg implements DzgConfig {
 	  node.nodeValue.replace(/{{(.*)}}/g, (initData, key) => {
 			// key可能会是xx.yy
       let obj = this.getObject(key)
-		  let initQue = this.mapHtml.get(obj) || []
+		  let initQue = this.mapHtml.get(obj.target) || []
 		  initQue.push(node)
-		  this.mapHtml.set(obj, initQue)
+		  this.mapHtml.set(obj.target, initQue)
 		  return obj.target[obj.key]
 	  })
 	  // 把{{变量}}把变量全部提取出来
@@ -111,10 +112,11 @@ class Dzg implements DzgConfig {
         return Reflect.get(target, key, receiver)
       },
       set(target, key, value, receiver) {
+        console.log(that.mapHtml)
         if (value === target[key]) {
           return false
         } else {
-          let Queue = that.mapHtml.get({target, key})
+          let Queue = that.mapHtml.get(data) || []
           Queue && Queue.forEach((Value) => {
             Value.nodeValue = value
           })
