@@ -113,7 +113,10 @@ class Dzg implements DzgConfig {
       // console.log(attr)
       if (type !== 0) removeList.push(attr.nodeName)
       if (value === null) continue
-      if (type === 2) {
+      if (type === 1) {
+
+      }
+      else if (type === 2) {
         if (value !== null) {
           // console.log(this.method)
           if (value in this.method)
@@ -129,6 +132,8 @@ class Dzg implements DzgConfig {
     removeList.forEach(value => node.removeAttribute(value))
     // addList.forEach((value, key) => node.setAttribute(key, value))
     console.log(removeList)
+    // let root = document.getElementById('root')
+
   }
 	/**
 	 * node有各种api:

@@ -126,7 +126,9 @@ var Dzg = (function () {
                 removeList.push(attr.nodeName);
             if (value === null)
                 continue;
-            if (type === 2) {
+            if (type === 1) {
+            }
+            else if (type === 2) {
                 if (value !== null) {
                     // console.log(this.method)
                     if (value in this.method)
@@ -143,6 +145,7 @@ var Dzg = (function () {
         removeList.forEach(function (value) { return node.removeAttribute(value); });
         // addList.forEach((value, key) => node.setAttribute(key, value))
         console.log(removeList);
+        // let root = document.getElementById('root')
     };
     /**
      * node有各种api:
