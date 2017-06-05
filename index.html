@@ -10,20 +10,18 @@
 <body>
     <div id="root">
         <div dzg-onclick="plus">
-            {{message.a}}
+            {{message}}
         </div>
     </div>
     <script>
         var dzg=new Dzg({
             el:"#root",
             data:{
-              message:{
-                a:1
-              }
+              message: 1
             },
             method:{
               plus(){
-                console.log(this)
+                this.message++
               }
             }
         })

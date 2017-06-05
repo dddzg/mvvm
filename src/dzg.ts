@@ -4,7 +4,7 @@ interface Data {
 interface DzgConfig {
 	el: string,
 	data: Data,
-  method?: any
+  method: any,
 }
 
 class Dzg implements DzgConfig {
@@ -16,14 +16,18 @@ class Dzg implements DzgConfig {
 	data: Data
 	domRoot: HTMLElement
 	mapHtml: Map<Data, Node[]> = new Map()
-
+  method: any
+  prefix= 'dzg-'
 	constructor(config: DzgConfig) {
 		this.el = config.el
 		let that = this
-    this.data = this.buildProxy(config.data)
+    this.method = config.method // 调用时 绑定this.data
 		this.domRoot = document.querySelector(this.el) as HTMLElement
+    this.data = this.buildProxy(config.data)
 		this.parseAndRender(this.domRoot)
-    config.method.plus()
+
+    // this.method.plus()
+    // config.method.plus.bind(this.data)()
 		// this.proxy.message='123'
 		// console.log(this.proxy.message);
 	}
@@ -42,12 +46,20 @@ class Dzg implements DzgConfig {
 	 */
 	parseAndRender(root: HTMLElement) {
 		for (let i = 0; i < root.childNodes.length; ++i) {
-			Dzg.nowNode = root.childNodes.item(i)
+			Dzg.nowNode = root.childNodes[i]
 			// text的情况
 			if (Dzg.nowNode.nodeName === Dzg.nodeType.text) { 
         // <div>123</div>不会再这一层解析
 				this.parseText(Dzg.nowNode)
-			}
+			}else {
+        if (Dzg.nowNode.attributes) {
+          /**
+           * 类似于 <div dzg-onclick="plus"></div>
+           * 记得把事件委托到root结点 统一处理 
+           */
+          this.parseTagWithAttributes(Dzg.nowNode)
+        }
+      }
 			// else{
 			//     console.log(Dzg.nowNode.nodeName,Dzg.nodeName.text);
 			// }
@@ -58,6 +70,46 @@ class Dzg implements DzgConfig {
 			// if (child.nodeType)
 		}
 	}
+  parseAttribute(attr: Attr) {
+    let name = attr.nodeName
+    let reg = RegExp(`${this.prefix}(.+)`, 'i')
+    let result = name.match(reg)
+    if (result) {
+      let key = result[1], type
+      if (key === 'if') type = 1 // if类型
+      else if (key.slice(0, 2) === 'on') {
+        key = key.slice(2)
+        type = 2 // on事件类型
+      }
+      else type = 3  // 绑定变量上去
+      return {
+        key,
+        type,
+        value: attr.nodeValue
+      }
+    }
+    return {
+      key: name,
+      type: 0 , // 可以考虑symbol
+      value: attr.nodeValue
+    }
+  }
+  parseTagWithAttributes(node: Node) {
+    let attributes = node.attributes
+    let length = node.attributes.length
+    for (let i = 0; i < length; ++i) {
+      let attr = attributes[i]
+      let {key, type, value} = this.parseAttribute(attr)
+      console.log(key, type, value)
+      if (type === 2) {
+        if (value !== null) {
+          console.log(this.method)
+          if (value in this.method)
+          node.addEventListener(key, this.method[value].bind(this.data))
+        }
+      }
+    }
+  }
 	/**
 	 * node有各种api:
 	 * nodeValue,textContent,data。
@@ -70,13 +122,13 @@ class Dzg implements DzgConfig {
 	parseText(node: Node) {
 	  if (node.nodeValue === null) return
 	  node.nodeValue =
-	  node.nodeValue.replace(/{{(.*)}}/g, (initData, key) => {
-			// key可能会是xx.yy
-      let obj = this.getObject(key)
-		  let initQue = this.mapHtml.get(obj.target) || []
+	  node.nodeValue.replace(/{{(.*)}}/g, (initData, initKey) => {
+			// initKey可能会是xx.yy
+      let {target, key} = this.getObject(initKey)
+		  let initQue = this.mapHtml.get(target) || []
 		  initQue.push(node)
-		  this.mapHtml.set(obj.target, initQue)
-		  return obj.target[obj.key]
+		  this.mapHtml.set(target, initQue)
+		  return target[key]
 	  })
 	  // 把{{变量}}把变量全部提取出来
 	}

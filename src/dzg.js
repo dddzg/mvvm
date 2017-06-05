@@ -28,12 +28,15 @@ var __read = (this && this.__read) || function (o, n) {
 var Dzg = (function () {
     function Dzg(config) {
         this.mapHtml = new Map();
+        this.prefix = 'dzg-';
         this.el = config.el;
         var that = this;
-        this.data = this.buildProxy(config.data);
+        this.method = config.method; // 调用时 绑定this.data
         this.domRoot = document.querySelector(this.el);
+        this.data = this.buildProxy(config.data);
         this.parseAndRender(this.domRoot);
-        config.method.plus();
+        // this.method.plus()
+        // config.method.plus.bind(this.data)()
         // this.proxy.message='123'
         // console.log(this.proxy.message);
     }
@@ -51,11 +54,20 @@ var Dzg = (function () {
      */
     Dzg.prototype.parseAndRender = function (root) {
         for (var i = 0; i < root.childNodes.length; ++i) {
-            Dzg.nowNode = root.childNodes.item(i);
+            Dzg.nowNode = root.childNodes[i];
             // text的情况
             if (Dzg.nowNode.nodeName === Dzg.nodeType.text) {
                 // <div>123</div>不会再这一层解析
                 this.parseText(Dzg.nowNode);
+            }
+            else {
+                if (Dzg.nowNode.attributes) {
+                    /**
+                     * 类似于 <div dzg-onclick="plus"></div>
+                     * 记得把事件委托到root结点 统一处理
+                     */
+                    this.parseTagWithAttributes(Dzg.nowNode);
+                }
             }
             // else{
             //     console.log(Dzg.nowNode.nodeName,Dzg.nodeName.text);
@@ -64,6 +76,48 @@ var Dzg = (function () {
                 this.parseAndRender(Dzg.nowNode); // 递归
             }
             // if (child.nodeType)
+        }
+    };
+    Dzg.prototype.parseAttribute = function (attr) {
+        var name = attr.nodeName;
+        var reg = RegExp(this.prefix + "(.+)", 'i');
+        var result = name.match(reg);
+        if (result) {
+            var key = result[1], type = void 0;
+            if (key === 'if')
+                type = 1; // if类型
+            else if (key.slice(0, 2) === 'on') {
+                key = key.slice(2);
+                type = 2; // on事件类型
+            }
+            else
+                type = 3; // 绑定变量上去
+            return {
+                key: key,
+                type: type,
+                value: attr.nodeValue
+            };
+        }
+        return {
+            key: name,
+            type: 0,
+            value: attr.nodeValue
+        };
+    };
+    Dzg.prototype.parseTagWithAttributes = function (node) {
+        var attributes = node.attributes;
+        var length = node.attributes.length;
+        for (var i = 0; i < length; ++i) {
+            var attr = attributes[i];
+            var _a = this.parseAttribute(attr), key = _a.key, type = _a.type, value = _a.value;
+            console.log(key, type, value);
+            if (type === 2) {
+                if (value !== null) {
+                    console.log(this.method);
+                    if (value in this.method)
+                        node.addEventListener(key, this.method[value].bind(this.data));
+                }
+            }
         }
     };
     /**
@@ -80,13 +134,13 @@ var Dzg = (function () {
         if (node.nodeValue === null)
             return;
         node.nodeValue =
-            node.nodeValue.replace(/{{(.*)}}/g, function (initData, key) {
-                // key可能会是xx.yy
-                var obj = _this.getObject(key);
-                var initQue = _this.mapHtml.get(obj.target) || [];
+            node.nodeValue.replace(/{{(.*)}}/g, function (initData, initKey) {
+                // initKey可能会是xx.yy
+                var _a = _this.getObject(initKey), target = _a.target, key = _a.key;
+                var initQue = _this.mapHtml.get(target) || [];
                 initQue.push(node);
-                _this.mapHtml.set(obj.target, initQue);
-                return obj.target[obj.key];
+                _this.mapHtml.set(target, initQue);
+                return target[key];
             });
         // 把{{变量}}把变量全部提取出来
     };
